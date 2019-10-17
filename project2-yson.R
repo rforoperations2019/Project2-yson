@@ -24,7 +24,10 @@ ui <- navbarPage("NYC Wi-Fi Hotspot Locations",
                               radioButtons("boro",
                                            "Borough Filter:",
                                            choices = levels(wifi.load$boro),
-                                           selected = "BK")
+                                           selected = "BK"),
+                              # download button
+                              downloadButton(outputId = "downloadData",
+                                             label = "Download raw data!")
                             ),
                             mainPanel(
                               # Using Shiny JS
@@ -62,7 +65,6 @@ server <- function(input, output) {
    ## Wifi Filtered data
    wifiInputs <- reactive({
      wifi <- wifi.load
-
      req(input$boro)
      # Boros
      wifi <- subset(wifi, boro == input$boro)
@@ -78,9 +80,16 @@ server <- function(input, output) {
         clearMarkers() %>%
         addMarkers()
     })
-
+    # Data table
     output$table <- DT::renderDataTable(wifiInputs()@data, options = list(scrollX = T))
-
+    # Download data
+    output$downloadData <- downloadHandler(
+      filename = function(){
+        paste0("wifiNYC",Sys.Date(),".csv")
+      },
+      content = function(file) {
+        write.csv(wifiInputs(), file)
+      })
  }
 
 # Run the application 
