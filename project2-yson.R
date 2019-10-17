@@ -7,10 +7,13 @@ library(rgdal)
 library(shinyjs)
 library(rgeos)
 library(ggplot2)
+library(stringr)
+library(tools)
+library(plotly)
 
 # Data Source: https://data.cityofnewyork.us/Social-Services/NYC-Wi-Fi-Hotspot-Locations/a9we-mtpn
 wifi.load <- readOGR("https://data.cityofnewyork.us/api/geospatial/a9we-mtpn?method=export&format=GeoJSON")
-names(wifi.load)[c(21,28)] <- c("longitude", "latitude")
+names(wifi.load)[c(7,11,12,13,15,21,28)] <- c("wifi_provider","wifi_location","wifi_type","postal_code","borough_code","longitude", "latitude")
 boros.load <- readOGR("https://data.cityofnewyork.us/api/geospatial/tqmj-j8zm?method=export&format=GeoJSON")
 # Add Boro centroids to dataframe
 boros.load@data <- cbind(boros.load@data, rgeos::gCentroid(boros.load, byid = TRUE)@coords)
@@ -26,15 +29,21 @@ ui <- navbarPage("NYC Wi-Fi Hotspot Locations",
                                            "Borough Filter:",
                                            choices = levels(wifi.load$boro),
                                            selected = "BK"),
-                              # Select variable for y-axis ----------------------------------
-                              selectInput(inputId = "plotA", 
-                                          label = "chartData",
-                                          choices = c("City" ="city",
-                                                      "Boroname" = "boroname",
-                                                      "Boro Code" = "borocd"
+                              # Select variable for y-axis 
+                              selectInput(inputId = "geoChart", 
+                                          label = "Choose geo data for graph (left)!",
+                                          choices = c("Postcode" ="postal_code",
+                                                      "Boro Code" = "borough_code"
                                                       ), 
-                                          selected = "city"),
+                                          selected = "borocd"),
                               #ssid, provider, location
+                              selectInput(inputId = "wifiChart", 
+                                          label = "Choose wifi information for graph (right)!",
+                                          choices = c("Wifi Type" ="wifi_type",
+                                                      "Wifi Provider" = "wifi_provider",
+                                                      "Wifi Location" = "wifi_location"
+                                          ), 
+                                          selected = "city"),
                               # download button
                               downloadButton(outputId = "downloadData",
                                              label = "Download raw data!")
@@ -48,11 +57,16 @@ ui <- navbarPage("NYC Wi-Fi Hotspot Locations",
                               # Map Output
                               leafletOutput("leaflet"),
                               br(), br(), 
-                              # Box plot
-                              plotOutput(outputId = "boxplot")
+                              # Bar chart
+                              fluidRow(
+                                column(6,plotOutput("geoBar")
+                                ),
+                                column(6,plotOutput("wifiBar")
+                                )
                               )
                             )
-                          ),
+                          )
+                        ),
                  # Data Table Pannel
                  tabPanel("Data",
                           fluidPage(
@@ -93,17 +107,29 @@ server <- function(input, output) {
         clearMarkers() %>%
         addMarkers()
     })
-    # Show boxplot
-    output$boxplot <- renderPlot({
+    # A plot gives detailed counts for geo data (zipcode, borough)
+    output$geoBar <- renderPlot({
       ggplot(data = data.frame(wifiInputs())) +
-        geom_bar(aes_string(input$plotA)) #+
-        # scale_x_discrete(paste("Satisfaction with", toTitleCase(str_replace_all(input$x, "_", " "))),
+        geom_bar(aes_string(input$geoChart)) + 
+        labs(toTitleCase(str_replace_all(input$geoChart, "_", " "))) +
+        theme_classic() +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1))
+        
         #                  labels= axisTitles.7sat, 
         #                  limit = c("1","2","3","4","5","6","7")) +
         # scale_y_continuous(paste("Satisfaction with", toTitleCase(str_replace_all(input$y, "_", " "))),
         #                    breaks = c(1,2,3,4,5,6,7), label = axisTitles.7sat) +
         # theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
         # labs(title = pretty_plot_title())
+    })
+    # A plot gives detailed counts for wifi (type, provider, location)
+    output$wifiBar <- renderPlot({
+      ggplot(data = data.frame(wifiInputs())) +
+        geom_bar(aes_string(input$wifiChart)) + 
+        labs(toTitleCase(str_replace_all(input$wifiChart, "_", " ")))+
+        theme_classic() +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1))
+        
     })
     # Data table
     output$table <- DT::renderDataTable(wifiInputs()@data, options = list(scrollX = T))
