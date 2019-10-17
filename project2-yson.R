@@ -6,6 +6,7 @@ library(leaflet.extras)
 library(rgdal)
 library(shinyjs)
 library(rgeos)
+library(ggplot2)
 
 # Data Source: https://data.cityofnewyork.us/Social-Services/NYC-Wi-Fi-Hotspot-Locations/a9we-mtpn
 wifi.load <- readOGR("https://data.cityofnewyork.us/api/geospatial/a9we-mtpn?method=export&format=GeoJSON")
@@ -25,6 +26,15 @@ ui <- navbarPage("NYC Wi-Fi Hotspot Locations",
                                            "Borough Filter:",
                                            choices = levels(wifi.load$boro),
                                            selected = "BK"),
+                              # Select variable for y-axis ----------------------------------
+                              selectInput(inputId = "plotA", 
+                                          label = "chartData",
+                                          choices = c("City" ="city",
+                                                      "Boroname" = "boroname",
+                                                      "Boro Code" = "borocd"
+                                                      ), 
+                                          selected = "city"),
+                              #ssid, provider, location
                               # download button
                               downloadButton(outputId = "downloadData",
                                              label = "Download raw data!")
@@ -36,7 +46,10 @@ ui <- navbarPage("NYC Wi-Fi Hotspot Locations",
                               tags$style(type = "text/css", ".leaflet {height: calc(100vh - 90px) !important;}
                                          body {background-color: #D4EFDF;}"),
                               # Map Output
-                              leafletOutput("leaflet")
+                              leafletOutput("leaflet"),
+                              br(), br(), 
+                              # Box plot
+                              plotOutput(outputId = "boxplot")
                               )
                             )
                           ),
@@ -79,6 +92,18 @@ server <- function(input, output) {
         # In this case either lines 92 or 93 will work
         clearMarkers() %>%
         addMarkers()
+    })
+    # Show boxplot
+    output$boxplot <- renderPlot({
+      ggplot(data = data.frame(wifiInputs())) +
+        geom_bar(aes_string(input$plotA)) #+
+        # scale_x_discrete(paste("Satisfaction with", toTitleCase(str_replace_all(input$x, "_", " "))),
+        #                  labels= axisTitles.7sat, 
+        #                  limit = c("1","2","3","4","5","6","7")) +
+        # scale_y_continuous(paste("Satisfaction with", toTitleCase(str_replace_all(input$y, "_", " "))),
+        #                    breaks = c(1,2,3,4,5,6,7), label = axisTitles.7sat) +
+        # theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+        # labs(title = pretty_plot_title())
     })
     # Data table
     output$table <- DT::renderDataTable(wifiInputs()@data, options = list(scrollX = T))
